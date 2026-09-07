@@ -12,6 +12,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: write
+
 jobs:
   test:
     name: Run test suite
@@ -72,13 +75,44 @@ jobs:
           fi
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
 
+      - name: Compute version numbers
+        id: version
+        run: |
+          set -e
+          MAJOR=$(jq -r '.major' .github/version.json)
+          MINOR=$(jq -r '.minor' .github/version.json)
+          BUILD=$(jq -r '.build' .github/version.json)
+          VERSION_CODE=$(jq -r '.versionCode' .github/version.json)
+
+          if [ "${{ github.event_name }}" = "push" ]; then
+            MINOR=$((MINOR + 1))
+            BUILD=1
+          else
+            BUILD=$((BUILD + 1))
+          fi
+          VERSION_CODE=$((VERSION_CODE + 1))
+
+          BUILD_PADDED=$(printf "%03d" "$BUILD")
+          VERSION_NAME="${MAJOR}.${MINOR}.${BUILD_PADDED}"
+
+          echo "Computed version: $VERSION_NAME (versionCode $VERSION_CODE)"
+
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+
       - name: Build signed App Bundle
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/upload-keystore.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: flutter build appbundle --release --build-number=${{ github.run_number }}
+        run: |
+          flutter build appbundle --release \
+            --build-name=${{ steps.version.outputs.version_name }} \
+            --build-number=${{ steps.version.outputs.version_code }}
 
       - name: Publish to Google Play Production
         uses: r0adkll/upload-google-play@v1
@@ -87,3 +121,20 @@ jobs:
           packageName: com.rebustechnologies.kristle
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
           track: production
+
+      - name: Persist version bump
+        run: |
+          set -e
+          cat > .github/version.json <<EOF
+          {
+            "major": ${{ steps.version.outputs.major }},
+            "minor": ${{ steps.version.outputs.minor }},
+            "build": ${{ steps.version.outputs.build }},
+            "versionCode": ${{ steps.version.outputs.version_code }}
+          }
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/version.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }}) [skip ci]"
+          git push origin HEAD:main
