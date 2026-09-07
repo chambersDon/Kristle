@@ -1,0 +1,12 @@
+# Copy this file to "key.properties" in this same directory (android/key.properties) for
+# local release builds. That file is gitignored (see android/.gitignore) and MUST NEVER be
+# committed — it holds the real release-signing credentials.
+#
+# In CI, these same four values are supplied instead via environment variables
+# (ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD)
+# sourced from GitHub Actions repository secrets — see android/app/build.gradle.kts.
+
+storePassword=REPLACE_WITH_YOUR_KEYSTORE_PASSWORD
+keyPassword=REPLACE_WITH_YOUR_KEY_PASSWORD
+keyAlias=upload
+storeFile=REPLACE_WITH_ABSOLUTE_PATH_TO_YOUR_UPLOAD_KEYSTORE.jks
