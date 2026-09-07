@@ -5,6 +5,12 @@ on:
     branches: ["**"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy to Google Play Production if tests pass"
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -28,7 +34,12 @@ jobs:
   build_and_deploy:
     name: Build, sign, and publish to Play Store
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.deploy == true)
+      )
     runs-on: ubuntu-latest
     concurrency:
       group: play-store-deploy
